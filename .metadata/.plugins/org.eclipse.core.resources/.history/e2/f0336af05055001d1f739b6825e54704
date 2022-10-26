@@ -20,9 +20,9 @@ public class SR {
 			System.out.println(" java SR 0 port file (send mode)\n" + " java SR 1 host port file  (recv mode)");
 			System.exit(1);
 		}
-//code revert. xyz
-		s.run(a);
 
+		s.run(a);
+//sdfg
 	} 
 
 	public void run(String[] a) throws Exception {
