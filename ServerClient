@@ -1,0 +1,213 @@
+package Data;
+
+
+
+import java.net.Socket;
+import java.net.ServerSocket;
+import java.io.FileOutputStream;
+import java.io.FileInputStream;
+
+public class SR {
+
+	public static int BUFSIZ;
+
+	public static void main(String[] a) throws Exception {
+
+		SR s = new SR();
+
+		BUFSIZ = 512;
+		if (a.length < 2) {
+			System.out.println(" java SR 0 port file (send mode)\n" + " java SR 1 host port file  (recv mode)");
+			System.exit(1);
+		}
+
+		s.run(a);
+
+	} 
+
+	public void run(String[] a) throws Exception {
+
+		int mode = Integer.parseInt(a[0]);
+		
+
+		switch (mode) {
+		case 0:
+			dosend(a);
+			
+			//file input- encode-bytecode- server-socket- 
+			//decimal -> binary ->byte
+			
+			break;
+		case 1:
+			dorecv(a);
+			
+			//file -socket-byte- decoded- file -print
+			//byte-> binary->decimal
+			break;
+		}
+	} 
+
+	public void dosend(String[] a) throws Exception {
+
+		/* add all your code here */
+		byte[] buffer = new byte[BUFSIZ], byteArr1 = new byte[12800];
+		long decimal = 0;
+		int read, pos = 0, count = 0, numbers = 0, length = 0;
+		boolean flag = false;
+
+		FileInputStream fileInputStream = new FileInputStream(a[2]);
+
+		while ((read = fileInputStream.read(buffer, 0, BUFSIZ)) != -1) {
+			for (int j = 0; j < read; j++) {
+				char ch = (char) buffer[j];
+
+				if (ch == '\r' || ch == '\n') {
+					if (ch == '\r')
+						flag = true;
+					if (ch == '\n' && flag)
+						continue;
+
+					
+					int[] binary = new int[32];
+					for (int m = 31; m >= 0; m--) {
+						binary[m] = (byte) (decimal % 2);
+						decimal /= 2;
+					}
+					decimal = 0;
+
+					if (pos >= byteArr1.length) {
+						byte tmp[] = new byte[byteArr1.length + 12800];
+						for (int l = 0; l < byteArr1.length; l++)
+							tmp[l] = byteArr1[l];
+						byteArr1 = tmp;
+					}
+
+					int byte1 = 0;
+					for (int m = 0; m < 8; m++)
+						byte1 = byte1 * 2 + binary[m];
+					byteArr1[pos] = (byte) byte1;
+
+					int byte2 = 0;
+					for (int m = 8; m < 16; m++)
+						byte2 = byte2 * 2 + binary[m];
+					byteArr1[pos + 1] = (byte) byte2;
+
+					int byte3 = 0;
+					for (int m = 16; m < 24; m++)
+						byte3 = byte3 * 2 + binary[m];
+					byteArr1[pos + 2] = (byte) byte3;
+
+					int byte4 = 0;
+					for (int m = 24; m < 32; m++)
+						byte4 = byte4 * 2 + binary[m];
+					byteArr1[pos + 3] = (byte) byte4;
+
+					count = pos += 4;
+					numbers += 1;
+				} else {
+					flag = false;
+					decimal = decimal * 10 + ch - '0';
+				}
+			}
+			length += read;
+		}
+
+		int port = Integer.parseInt(a[1]);
+
+		ServerSocket serverSocket = new ServerSocket(port);
+		Socket socket = serverSocket.accept();
+
+		socket.getOutputStream().write(byteArr1, 0, pos);
+		socket.getOutputStream().flush();
+
+		fileInputStream.close();
+		socket.close();
+
+		System.out.println("sent " + numbers + " numbers, file " + length + " bytes, transmit " + count + " bytes");
+	} /* dosend */
+
+	public void dorecv(String[] a) throws Exception {
+
+		/* add your code here */
+		int port = Integer.parseInt(a[2]);
+
+		FileOutputStream fileOutputStream = new FileOutputStream(a[3]);
+
+		byte[] buffer = new byte[BUFSIZ], number, byteArr2 = new byte[4], newLine = new byte[] { 13, 10 };
+		int read, pos = 0, length = 0, count = 0, numbers = 0, place;
+
+		Socket socket = new Socket(a[1], port);
+
+		while ((read = socket.getInputStream().read(buffer, 0, BUFSIZ)) != -1) {
+			for (int j = 0; j < read; j++) {
+				byteArr2[pos++] = buffer[j];
+
+				if (pos == byteArr2.length) {
+					pos = 0;
+					numbers++;
+
+					long decimal = 0;
+					int[] binary = new int[32];
+
+					/* Bytes to binary */
+					int byte1 = byteArr2[0] < 0 ? (byteArr2[0] + 256) : byteArr2[0];
+					for (int l = 7; l >= 0; l--) {
+						binary[l] = byte1 % 2;
+						byte1 /= 2;
+					}
+
+					int byte2 = byteArr2[1] < 0 ? (byteArr2[1] + 256) : byteArr2[1];
+					for (int l = 15; l >= 8; l--) {
+						binary[l] = byte2 % 2;
+						byte2 /= 2;
+					}
+
+					int byte3 = byteArr2[2] < 0 ? (byteArr2[2] + 256) : byteArr2[2];
+					for (int l = 23; l >= 16; l--) {
+						binary[l] = byte3 % 2;
+						byte3 /= 2;
+					}
+
+					int byte4 = byteArr2[3] < 0 ? (byteArr2[3] + 256) : byteArr2[3];
+					for (int l = 31; l >= 24; l--) {
+						binary[l] = byte4 % 2;
+						byte4 /= 2;
+					}
+
+					
+					for (int k = 31; k >= 0; k--) {
+						long factor = 1;
+						int pow = 31 - k;
+
+						for (int l = 0; l < pow; l++)
+							factor *= 2;
+
+						decimal += binary[k] * factor;
+					}
+
+					number = new byte[10];
+					place = number.length - 1;
+
+					for (; decimal > 0; length++) {
+						number[place--] = (byte) (decimal % 10 + '0');
+						decimal /= 10;
+					}
+
+					fileOutputStream.write(number, place + 1, number.length - (place + 1));
+					fileOutputStream.write(newLine, 0, 2);
+
+					length += 2;
+				}
+			}
+
+			count += read;
+		}
+
+		fileOutputStream.close();
+		socket.getInputStream().close();
+		socket.close();
+
+		System.out.println("recv " + numbers + " numbers, file " + length + " bytes, transmit " + count + " bytes");
+	} /* dorecv */
+
+} /* class SR */
