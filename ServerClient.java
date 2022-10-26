@@ -22,8 +22,7 @@ public class SR {
 		}
 
 		s.run(a);
-//sdfg
-		//check
+
 	} 
 
 	public void run(String[] a) throws Exception {
